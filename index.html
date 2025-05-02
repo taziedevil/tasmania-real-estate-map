@@ -124,7 +124,7 @@ document.addEventListener('DOMContentLoaded', function () {
           document.querySelectorAll('#listings li').forEach(li => li.classList.remove('active'));
           li.classList.add('active');
           map.flyTo(marker.getLatLng(), 13, { animate: true, duration: 1.5 });
-          setTimeout(() => marker.openPopup(), 1500);
+          map.once('moveend', () => { marker.openPopup(); });
           sidebar.classList.add('collapsed');
         };
         document.getElementById('listings').appendChild(li);
@@ -175,16 +175,19 @@ document.addEventListener('DOMContentLoaded', function () {
     sidebar.classList.toggle('collapsed');
   };
 
-  // Auto-display visible popups when moving or zooming
-  map.on('moveend', () => {
-    const bounds = map.getBounds();
-    markers.eachLayer(marker => {
-      if (bounds.contains(marker.getLatLng()) && map.getZoom() >= 12) {
-        marker.openPopup();
-      } else {
-        marker.closePopup();
-      }
-    });
+  map.on('zoomend', () => {
+    if (map.getZoom() >= 12) {
+      const bounds = map.getBounds();
+      markers.eachLayer(marker => {
+        if (bounds.contains(marker.getLatLng())) {
+          marker.openPopup();
+        } else {
+          marker.closePopup();
+        }
+      });
+    } else {
+      markers.eachLayer(marker => marker.closePopup());
+    }
   });
 });
 </script>
