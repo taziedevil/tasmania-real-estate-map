@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fixed Tasmania Real Estate Map</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.Default.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-search/dist/leaflet-search.min.css" />
+  <style>
+    html, body, #container { margin: 0; padding: 0; height: 100%; width: 100%; font-family: sans-serif; }
+    #container { display: flex; }
+    #sidebar {
+      width: 300px; min-width: 200px; background: #f8f9fa; padding: 15px;
+      overflow-y: auto; border-right: 1px solid #ddd; transition: all 0.3s ease;
+    }
+    #sidebar.collapsed { width: 0; padding: 0; overflow: hidden; }
+    #sidebar h2 { margin-top: 0; font-size: 20px; }
+    #toggleButton {
+      background: #006400; color: white; border: none; padding: 8px 12px;
+      font-size: 18px; border-radius: 5px; margin-bottom: 10px; cursor: pointer;
+    }
+    #listings { list-style: none; padding: 0; }
+    #listings li {
+      margin-bottom: 10px; cursor: pointer; font-weight: bold; color: #006400;
+      transition: background 0.2s, color 0.2s; padding: 5px 10px; border-radius: 5px;
+    }
+    #listings li:hover { background: #e6f4ea; color: #004d00; }
+    #listings li.active { background: #c7e8d4; color: #004d00; }
+    #map { flex-grow: 1; }
+    .muni-label {
+      background: transparent; border: none; color: #333; font-weight: bold;
+      font-size: 13px; text-shadow: 1px 1px 2px white; padding: 2px 5px;
+      opacity: 0; animation: fadeIn 1.5s ease forwards; animation-delay: 1s;
+    }
+    @keyframes fadeIn { to { opacity: 1; } }
+    .leaflet-control-search {
+      top: 15px !important; right: 10px !important; left: auto !important;
+      width: 300px; max-width: 80%; z-index: 1000;
+    }
+    .leaflet-control-search input {
+      border-radius: 20px; padding: 8px 12px; font-size: 16px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2); border: 1px solid #ccc;
+    }
+    .reset-view-button {
+      background: white; border: 1px solid #ccc; border-radius: 20px;
+      padding: 6px 12px; font-size: 14px; font-weight: bold;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2); cursor: pointer;
+      margin-top: 5px; display: inline-block;
+    }
+    .leaflet-top.leaflet-right {
+      display: flex; flex-direction: column; align-items: flex-end;
+      margin-top: 10px; gap: 5px;
+    }
+  </style>
+</head>
+<body>
+<div id="container">
+  <div id="sidebar">
+    <button id="toggleButton">☰ Menu</button>
+    <h2>Municipalities</h2>
+    <ul id="listings"></ul>
+  </div>
+  <div id="map"></div>
+</div>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster/dist/leaflet.markercluster.js"></script>
+<script src="https://unpkg.com/leaflet-search/dist/leaflet-search.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const sheetID = '1vbmHTf69XVp827i8al6erUSslZXS7qsTj2RUMfhw2zc';
+  const sheetURL = `https://opensheet.elk.sh/${sheetID}/Sheet1`;
+
+  const map = L.map('map').setView([-42.8821, 147.3272], 7);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; OpenStreetMap contributors &copy; CartoDB'
+  }).addTo(map);
+
+  const markers = L.markerClusterGroup();
+  const sidebar = document.getElementById('sidebar');
+
+  fetch(sheetURL).then(r => r.json()).then(data => {
+    const markerList = [];
+
+    data.forEach(muni => {
+      if (muni.Lat && muni.Lng) {
+        const price = Number(muni.Median_House_Price);
+        let icon = 'https://maps.google.com/mapfiles/ms/icons/green-dot.png';
+        if (price > 700000) icon = 'https://maps.google.com/mapfiles/ms/icons/red-pushpin.png';
+        else if (price > 500000) icon = 'https://maps.google.com/mapfiles/ms/icons/blue-pushpin.png';
+
+        const marker = L.marker([muni.Lat, muni.Lng], {
+          icon: L.icon({
+            iconUrl: icon,
+            iconSize: [32, 32],
+            iconAnchor: [16, 32],
+            popupAnchor: [0, -32]
+          }),
+          title: muni.Municipality
+        });
+
+        marker.bindPopup(`
+          <b>${muni.Municipality}</b><br>
+          <b>House:</b> $${price.toLocaleString()} (${muni.House_Sales} sales)<br>
+          <b>Unit:</b> $${Number(muni.Median_Unit_Price).toLocaleString()} (${muni.Unit_Sales} sales)<br>
+          <b>Land:</b> $${Number(muni.Median_Land_Price).toLocaleString()} (${muni.Land_Sales} sales)
+        `);
+
+        marker.bindTooltip(muni.Municipality, {
+          permanent: true,
+          direction: 'top',
+          offset: [0, -25],
+          className: 'muni-label'
+        });
+
+        markers.addLayer(marker);
+        markerList.push(marker);
+
+        const li = document.createElement('li');
+        li.textContent = muni.Municipality;
+        li.onclick = () => {
+          document.querySelectorAll('#listings li').forEach(li => li.classList.remove('active'));
+          li.classList.add('active');
+          map.flyTo(marker.getLatLng(), 13, { animate: true, duration: 1.5 });
+          setTimeout(() => marker.openPopup(), 1500);
+          sidebar.classList.add('collapsed');
+        };
+        document.getElementById('listings').appendChild(li);
+      }
+    });
+
+    map.addLayer(markers);
+
+    let delay = 0;
+    markerList.forEach(marker => {
+      setTimeout(() => {
+        const originalLatLng = marker.getLatLng();
+        let i = 0;
+        const bounce = setInterval(() => {
+          const offset = (i % 2 === 0) ? 0.0006 : -0.0006;
+          marker.setLatLng([originalLatLng.lat + offset, originalLatLng.lng]);
+          i++;
+          if (i > 4) {
+            clearInterval(bounce);
+            marker.setLatLng(originalLatLng);
+          }
+        }, 100);
+      }, delay);
+      delay += 80;
+    });
+  });
+
+  L.control.search({
+    position: 'topright',
+    layer: markers,
+    propertyName: 'title',
+    marker: false,
+    collapsed: false,
+    textPlaceholder: "Search Municipality..."
+  }).on('search:locationfound', e => {
+    map.flyTo(e.latlng, 13, { animate: true, duration: 1.5 });
+    setTimeout(() => e.layer.openPopup(), 1500);
+  }).addTo(map);
+
+  L.control({ position: 'topright' }).onAdd = function () {
+    const div = L.DomUtil.create('div', 'leaflet-bar');
+    div.innerHTML = '<div class="reset-view-button">Reset View</div>';
+    div.firstChild.onclick = () => map.setView([-42.8821, 147.3272], 7);
+    return div;
+  }.addTo(map);
+
+  document.getElementById('toggleButton').onclick = () => {
+    sidebar.classList.toggle('collapsed');
+  };
+
+  // Auto-display visible popups when moving or zooming
+  map.on('moveend', () => {
+    const bounds = map.getBounds();
+    markers.eachLayer(marker => {
+      if (bounds.contains(marker.getLatLng()) && map.getZoom() >= 12) {
+        marker.openPopup();
+      } else {
+        marker.closePopup();
+      }
+    });
+  });
+});
+</script>
+</body>
+</html>
