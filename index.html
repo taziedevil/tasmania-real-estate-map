@@ -166,8 +166,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
   L.control({ position: 'topright' }).onAdd = function () {
     const div = L.DomUtil.create('div', 'leaflet-bar');
-    div.innerHTML = '<div class="reset-view-button">Reset View</div>';
-    div.firstChild.onclick = () => map.setView([-42.8821, 147.3272], 7);
+    div.innerHTML = '<div class="reset-view-button">🔄 Reset View</div>';
+    div.firstChild.onclick = () => {
+      map.setView([-42.8821, 147.3272], 7);
+      markers.eachLayer(marker => marker.closePopup());
+    };
     return div;
   }.addTo(map);
 
