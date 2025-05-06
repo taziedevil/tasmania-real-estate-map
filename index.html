@@ -82,7 +82,20 @@ document.addEventListener('DOMContentLoaded', function () {
   const sidebar = document.getElementById('sidebar');
 
   fetch(sheetURL).then(r => r.json()).then(data => {
-    const markerList = [];
+    const listings = document.getElementById('listings');
+
+// Add "Tasmania View" to top of list
+const viewAllItem = document.createElement('li');
+viewAllItem.textContent = 'Tasmania View';
+viewAllItem.onclick = () => {
+  document.querySelectorAll('#listings li').forEach(li => li.classList.remove('active'));
+  viewAllItem.classList.add('active');
+  map.setView([-42.8821, 147.3272], 7);
+  markers.eachLayer(marker => marker.closePopup());
+};
+listings.appendChild(viewAllItem);
+
+const markerList = [];
 
     data.forEach(muni => {
       if (muni.Lat && muni.Lng) {
@@ -175,30 +188,7 @@ document.addEventListener('DOMContentLoaded', function () {
     sidebar.classList.toggle('collapsed');
   };
 
-  
-// ✅ Add working Reset View button after map and markers exist
-const resetButton = document.createElement("div");
-resetButton.className = "leaflet-reset-view";
-resetButton.textContent = "🔄 Reset View";
-resetButton.style.position = "absolute";
-resetButton.style.top = "100px";
-resetButton.style.right = "10px";
-resetButton.style.background = "white";
-resetButton.style.border = "1px solid #ccc";
-resetButton.style.borderRadius = "20px";
-resetButton.style.padding = "6px 12px";
-resetButton.style.fontSize = "14px";
-resetButton.style.fontWeight = "bold";
-resetButton.style.cursor = "pointer";
-resetButton.style.boxShadow = "0 2px 6px rgba(0, 0, 0, 0.2)";
-resetButton.onclick = function () {
-  map.setView([-42.8821, 147.3272], 7);
-  markers.eachLayer(marker => marker.closePopup());
-};
-document.body.appendChild(resetButton);
-
-// Auto-popup behavior
-map.on('moveend', () => {
+  map.on('moveend', () => {
     const bounds = map.getBounds();
     markers.eachLayer(marker => {
       if (bounds.contains(marker.getLatLng()) && map.getZoom() >= 12) {
