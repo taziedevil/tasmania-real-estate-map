@@ -166,11 +166,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
   L.control({ position: 'topright' }).onAdd = function () {
     const div = L.DomUtil.create('div', 'leaflet-bar');
-    div.innerHTML = '<div class="reset-view-button">🔄 Reset View</div>';
-    div.firstChild.onclick = () => {
-      map.setView([-42.8821, 147.3272], 7);
-      markers.eachLayer(marker => marker.closePopup());
-    };
+    div.innerHTML = '<div class="reset-view-button">Reset View</div>';
+    div.firstChild.onclick = () => map.setView([-42.8821, 147.3272], 7);
     return div;
   }.addTo(map);
 
@@ -205,12 +202,12 @@ document.addEventListener('DOMContentLoaded', function () {
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
     z-index: 1000;
     position: absolute;
-    top: 10px;
+    top: 60px;  /* push below search */
     right: 10px;
   }
 </style>
 <script>
-document.addEventListener("DOMContentLoaded", function() {
+setTimeout(() => {
   const resetButton = document.createElement("div");
   resetButton.className = "leaflet-reset-view";
   resetButton.textContent = "🔄 Reset View";
@@ -219,5 +216,5 @@ document.addEventListener("DOMContentLoaded", function() {
     markers.eachLayer(marker => marker.closePopup());
   };
   document.body.appendChild(resetButton);
-});
+}, 1000);
 </script>
