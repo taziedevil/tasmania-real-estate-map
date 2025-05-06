@@ -202,19 +202,24 @@ document.addEventListener('DOMContentLoaded', function () {
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
     z-index: 1000;
     position: absolute;
-    top: 60px;  /* push below search */
+    top: 100px;  /* further below search */
     right: 10px;
   }
 </style>
 <script>
-setTimeout(() => {
-  const resetButton = document.createElement("div");
-  resetButton.className = "leaflet-reset-view";
-  resetButton.textContent = "🔄 Reset View";
-  resetButton.onclick = function () {
-    map.setView([-42.8821, 147.3272], 7);
-    markers.eachLayer(marker => marker.closePopup());
-  };
-  document.body.appendChild(resetButton);
-}, 1000);
+document.addEventListener('DOMContentLoaded', function () {
+  const interval = setInterval(() => {
+    if (typeof map !== 'undefined' && typeof markers !== 'undefined') {
+      clearInterval(interval);
+      const resetButton = document.createElement("div");
+      resetButton.className = "leaflet-reset-view";
+      resetButton.textContent = "🔄 Reset View";
+      resetButton.onclick = function () {
+        map.setView([-42.8821, 147.3272], 7);
+        markers.eachLayer(marker => marker.closePopup());
+      };
+      document.body.appendChild(resetButton);
+    }
+  }, 300);
+});
 </script>
