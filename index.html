@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Fixed Tasmania Real Estate Map</title>
+  <title>Final Map - Scrollable Sidebar</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.css" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.Default.css" />
@@ -101,12 +101,12 @@ document.addEventListener('DOMContentLoaded', function () {
           title: muni.Municipality
         });
 
-        marker.bindPopup(`
-          <b>${muni.Municipality}</b><br>
+        marker.bindPopup(
+          `<b>${muni.Municipality}</b><br>
           <b>House:</b> $${price.toLocaleString()} (${muni.House_Sales} sales)<br>
           <b>Unit:</b> $${Number(muni.Median_Unit_Price).toLocaleString()} (${muni.Unit_Sales} sales)<br>
-          <b>Land:</b> $${Number(muni.Median_Land_Price).toLocaleString()} (${muni.Land_Sales} sales)
-        `);
+          <b>Land:</b> $${Number(muni.Median_Land_Price).toLocaleString()} (${muni.Land_Sales} sales)`
+        );
 
         marker.bindTooltip(muni.Municipality, {
           permanent: true,
@@ -125,7 +125,7 @@ document.addEventListener('DOMContentLoaded', function () {
           li.classList.add('active');
           map.flyTo(marker.getLatLng(), 13, { animate: true, duration: 1.5 });
           map.once('moveend', () => { marker.openPopup(); });
-          sidebar.classList.add('collapsed');
+          sidebar.classList.remove('collapsed');
         };
         document.getElementById('listings').appendChild(li);
       }
@@ -161,7 +161,7 @@ document.addEventListener('DOMContentLoaded', function () {
     textPlaceholder: "Search Municipality..."
   }).on('search:locationfound', e => {
     map.flyTo(e.latlng, 13, { animate: true, duration: 1.5 });
-    setTimeout(() => e.layer.openPopup(), 1500);
+    map.once('moveend', () => { e.layer.openPopup(); });
   }).addTo(map);
 
   L.control({ position: 'topright' }).onAdd = function () {
@@ -175,19 +175,15 @@ document.addEventListener('DOMContentLoaded', function () {
     sidebar.classList.toggle('collapsed');
   };
 
-  map.on('zoomend', () => {
-    if (map.getZoom() >= 12) {
-      const bounds = map.getBounds();
-      markers.eachLayer(marker => {
-        if (bounds.contains(marker.getLatLng())) {
-          marker.openPopup();
-        } else {
-          marker.closePopup();
-        }
-      });
-    } else {
-      markers.eachLayer(marker => marker.closePopup());
-    }
+  map.on('moveend', () => {
+    const bounds = map.getBounds();
+    markers.eachLayer(marker => {
+      if (bounds.contains(marker.getLatLng()) && map.getZoom() >= 12) {
+        marker.openPopup();
+      } else {
+        marker.closePopup();
+      }
+    });
   });
 });
 </script>
