@@ -56,7 +56,10 @@
   </style>
 </head>
 <body>
+
+<div id="topbar" class="mobile-nav"></div>
 <div id="container">
+
   <div id="sidebar">
     <button id="toggleButton">☰ Menu</button>
     <h2>Municipalities</h2>
@@ -81,7 +84,22 @@ document.addEventListener('DOMContentLoaded', function () {
   const markers = L.markerClusterGroup();
   const sidebar = document.getElementById('sidebar');
 
-  fetch(sheetURL).then(r => r.json()).then(data => {
+  
+fetch(sheetURL).then(r => r.json()).then(data => {
+  const topbar = document.getElementById('topbar');
+  const isMobile = window.innerWidth <= 768;
+
+  // Add "Tasmania View" to topbar as well
+  const topItem = document.createElement('div');
+  topItem.textContent = 'Tasmania View';
+  topItem.onclick = () => {
+    document.querySelectorAll('#topbar div').forEach(el => el.classList.remove('active'));
+    topItem.classList.add('active');
+    map.setView([-42.8821, 147.3272], 7);
+    markers.eachLayer(marker => marker.closePopup());
+  };
+  if (isMobile) topbar.appendChild(topItem);
+
     const listings = document.getElementById('listings');
 
 // Add "Tasmania View" to top of list
@@ -140,7 +158,20 @@ const markerList = [];
           map.once('moveend', () => { marker.openPopup(); });
           sidebar.classList.remove('collapsed');
         };
-        document.getElementById('listings').appendChild(li);
+        
+      if (isMobile) {
+        const mini = document.createElement('div');
+        mini.textContent = muni.Municipality;
+        mini.onclick = () => {
+          document.querySelectorAll('#topbar div').forEach(el => el.classList.remove('active'));
+          mini.classList.add('active');
+          map.flyTo(marker.getLatLng(), 13, { animate: true, duration: 1.5 });
+          map.once('moveend', () => marker.openPopup());
+        };
+        topbar.appendChild(mini);
+      }
+      document.getElementById('listings').appendChild(li);
+
       }
     });
 
@@ -202,3 +233,29 @@ const markerList = [];
 </script>
 </body>
 </html>
+
+<style>
+  @media (max-width: 768px) {
+    #sidebar { display: none; }
+    #topbar {
+      display: flex;
+      overflow-x: auto;
+      white-space: nowrap;
+      padding: 10px;
+      background: #f8f9fa;
+      gap: 8px;
+    }
+    #topbar div {
+      flex: 0 0 auto;
+      padding: 8px 12px;
+      background: #006400;
+      color: white;
+      border-radius: 20px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    #topbar div.active {
+      background: #004d00;
+    }
+  }
+</style>
