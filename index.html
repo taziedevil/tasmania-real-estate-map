@@ -1,261 +1,138 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Final Map - Scrollable Sidebar</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.css" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.Default.css" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet-search/dist/leaflet-search.min.css" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Tasmania Property Heatmap</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
   <style>
-    html, body, #container { margin: 0; padding: 0; height: 100%; width: 100%; font-family: sans-serif; }
-    #container { display: flex; }
-    #sidebar {
-      width: 300px; min-width: 200px; background: #f8f9fa; padding: 15px;
-      overflow-y: auto; border-right: 1px solid #ddd; transition: all 0.3s ease;
+    html, body, #map { height: 100%; margin: 0; font-family: sans-serif; }
+    .controls {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 1000;
+      background: white;
+      padding: 10px;
+      border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
     }
-    #sidebar.collapsed { width: 0; padding: 0; overflow: hidden; }
-    #sidebar h2 { margin-top: 0; font-size: 20px; }
-    #toggleButton {
-      background: #006400; color: white; border: none; padding: 8px 12px;
-      font-size: 18px; border-radius: 5px; margin-bottom: 10px; cursor: pointer;
-    }
-    #listings { list-style: none; padding: 0; }
-    #listings li {
-      margin-bottom: 10px; cursor: pointer; font-weight: bold; color: #006400;
-      transition: background 0.2s, color 0.2s; padding: 5px 10px; border-radius: 5px;
-    }
-    #listings li:hover { background: #e6f4ea; color: #004d00; }
-    #listings li.active { background: #c7e8d4; color: #004d00; }
-    #map { flex-grow: 1; }
-    .muni-label {
-      background: transparent; border: none; color: #333; font-weight: bold;
-      font-size: 13px; text-shadow: 1px 1px 2px white; padding: 2px 5px;
-      opacity: 0; animation: fadeIn 1.5s ease forwards; animation-delay: 1s;
-    }
-    @keyframes fadeIn { to { opacity: 1; } }
-    .leaflet-control-search {
-      top: 15px !important; right: 10px !important; left: auto !important;
-      width: 300px; max-width: 80%; z-index: 1000;
-    }
-    .leaflet-control-search input {
-      border-radius: 20px; padding: 8px 12px; font-size: 16px;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2); border: 1px solid #ccc;
-    }
-    .reset-view-button {
-      background: white; border: 1px solid #ccc; border-radius: 20px;
-      padding: 6px 12px; font-size: 14px; font-weight: bold;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2); cursor: pointer;
-      margin-top: 5px; display: inline-block;
-    }
-    .leaflet-top.leaflet-right {
-      display: flex; flex-direction: column; align-items: flex-end;
-      margin-top: 10px; gap: 5px;
+    .controls select {
+      margin: 5px 0;
+      width: 150px;
     }
   </style>
 </head>
 <body>
-
-<div id="topbar" class="mobile-nav"></div>
-<div id="container">
-
-  <div id="sidebar">
-    <button id="toggleButton">☰ Menu</button>
-    <h2>Municipalities</h2>
-    <ul id="listings"></ul>
-  </div>
   <div id="map"></div>
-</div>
+  <div class="controls">
+    <label for="metricSelect">Metric:</label><br>
+    <select id="metricSelect">
+      <option value="sales">Sales Volume</option>
+      <option value="price">Median Price</option>
+    </select><br>
+    <label for="typeSelect">Property Type:</label><br>
+    <select id="typeSelect">
+      <option value="house">Houses</option>
+      <option value="unit">Units</option>
+      <option value="land">Land</option>
+    </select>
+  </div>
 
-<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet.markercluster/dist/leaflet.markercluster.js"></script>
-<script src="https://unpkg.com/leaflet-search/dist/leaflet-search.min.js"></script>
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-  const sheetID = '1vbmHTf69XVp827i8al6erUSslZXS7qsTj2RUMfhw2zc';
-  const sheetURL = `https://opensheet.elk.sh/${sheetID}/Sheet1`;
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
+  <script>
+    const map = L.map('map').setView([-42.8821, 147.3272], 7);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
 
-  const map = L.map('map').setView([-42.8821, 147.3272], 7);
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-    attribution: '&copy; OpenStreetMap contributors &copy; CartoDB'
-  }).addTo(map);
+    let heatLayer = null;
 
-  const markers = L.markerClusterGroup();
-  const sidebar = document.getElementById('sidebar');
+    function fetchAndRender() {
+      const metric = document.getElementById('metricSelect').value;
+      const type = document.getElementById('typeSelect').value;
 
-  
-fetch(sheetURL).then(r => r.json()).then(data => {
-  const topbar = document.getElementById('topbar');
-  const isMobile = window.innerWidth <= 768;
+      const sheetID = '1vbmHTf69XVp827i8al6erUSslZXS7qsTj2RUMfhw2zc';
+      const url = `https://opensheet.elk.sh/${sheetID}/Sheet1`;
 
-  // Add "Tasmania View" to topbar as well
-  const topItem = document.createElement('div');
-  topItem.textContent = 'Tasmania View';
-  topItem.onclick = () => {
-    document.querySelectorAll('#topbar div').forEach(el => el.classList.remove('active'));
-    topItem.classList.add('active');
-    map.setView([-42.8821, 147.3272], 7);
-    markers.eachLayer(marker => marker.closePopup());
-  };
-  if (isMobile) topbar.appendChild(topItem);
+      fetch(url).then(r => r.json()).then(data => {
+        const heatData = [];
 
-    const listings = document.getElementById('listings');
+        data.forEach(muni => {
+          const lat = parseFloat(muni.Lat);
+          const lng = parseFloat(muni.Lng);
+          if (!lat || !lng) return;
 
-// Add "Tasmania View" to top of list
-const viewAllItem = document.createElement('li');
-viewAllItem.textContent = 'Tasmania View';
-viewAllItem.onclick = () => {
-  document.querySelectorAll('#listings li').forEach(li => li.classList.remove('active'));
-  viewAllItem.classList.add('active');
-  map.setView([-42.8821, 147.3272], 7);
-  markers.eachLayer(marker => marker.closePopup());
-};
-listings.appendChild(viewAllItem);
-
-const markerList = [];
-
-    data.forEach(muni => {
-      if (muni.Lat && muni.Lng) {
-        const price = Number(muni.Median_House_Price);
-        let icon = 'https://maps.google.com/mapfiles/ms/icons/green-dot.png';
-        if (price > 700000) icon = 'https://maps.google.com/mapfiles/ms/icons/red-pushpin.png';
-        else if (price > 500000) icon = 'https://maps.google.com/mapfiles/ms/icons/blue-pushpin.png';
-
-        const marker = L.marker([muni.Lat, muni.Lng], {
-          icon: L.icon({
-            iconUrl: icon,
-            iconSize: [32, 32],
-            iconAnchor: [16, 32],
-            popupAnchor: [0, -32]
-          }),
-          title: muni.Municipality
-        });
-
-        marker.bindPopup(
-          `<b>${muni.Municipality}</b><br>
-          <b>House:</b> $${price.toLocaleString()} (${muni.House_Sales} sales)<br>
-          <b>Unit:</b> $${Number(muni.Median_Unit_Price).toLocaleString()} (${muni.Unit_Sales} sales)<br>
-          <b>Land:</b> $${Number(muni.Median_Land_Price).toLocaleString()} (${muni.Land_Sales} sales)`
-        );
-
-        marker.bindTooltip(muni.Municipality, {
-          permanent: true,
-          direction: 'bottom',
-          offset: [0, 10],
-          className: 'muni-label'
-        });
-
-        markers.addLayer(marker);
-        markerList.push(marker);
-
-        const li = document.createElement('li');
-        li.textContent = muni.Municipality;
-        li.onclick = () => {
-          document.querySelectorAll('#listings li').forEach(li => li.classList.remove('active'));
-          li.classList.add('active');
-          map.flyTo(marker.getLatLng(), 13, { animate: true, duration: 1.5 });
-          map.once('moveend', () => { marker.openPopup(); });
-          sidebar.classList.remove('collapsed');
-        };
-        
-      if (isMobile) {
-        const mini = document.createElement('div');
-        mini.textContent = muni.Municipality;
-        mini.onclick = () => {
-          document.querySelectorAll('#topbar div').forEach(el => el.classList.remove('active'));
-          mini.classList.add('active');
-          map.flyTo(marker.getLatLng(), 13, { animate: true, duration: 1.5 });
-          map.once('moveend', () => marker.openPopup());
-        };
-        topbar.appendChild(mini);
-      }
-      document.getElementById('listings').appendChild(li);
-
-      }
-    });
-
-    map.addLayer(markers);
-
-    let delay = 0;
-    markerList.forEach(marker => {
-      setTimeout(() => {
-        const originalLatLng = marker.getLatLng();
-        let i = 0;
-        const bounce = setInterval(() => {
-          const offset = (i % 2 === 0) ? 0.0006 : -0.0006;
-          marker.setLatLng([originalLatLng.lat + offset, originalLatLng.lng]);
-          i++;
-          if (i > 4) {
-            clearInterval(bounce);
-            marker.setLatLng(originalLatLng);
+          let intensity = 0;
+          if (metric === "sales") {
+            if (type === "house") intensity = parseInt(muni.House_Sales);
+            else if (type === "unit") intensity = parseInt(muni.Unit_Sales);
+            else if (type === "land") intensity = parseInt(muni.Land_Sales);
+          } else if (metric === "price") {
+            if (type === "house") intensity = parseFloat(muni.Median_House_Price);
+            else if (type === "unit") intensity = parseFloat(muni.Median_Unit_Price);
+            else if (type === "land") intensity = parseFloat(muni.Median_Land_Price);
           }
-        }, 100);
-      }, delay);
-      delay += 80;
-    });
-  });
 
-  L.control.search({
-    position: 'topright',
-    layer: markers,
-    propertyName: 'title',
-    marker: false,
-    collapsed: false,
-    textPlaceholder: "Search Municipality..."
-  }).on('search:locationfound', e => {
-    map.flyTo(e.latlng, 13, { animate: true, duration: 1.5 });
-    map.once('moveend', () => { e.layer.openPopup(); });
-  }).addTo(map);
+          if (!isNaN(intensity) && intensity > 0) {
+            heatData.push([lat, lng, intensity]);
+          }
+        });
 
-  L.control({ position: 'topright' }).onAdd = function () {
-    const div = L.DomUtil.create('div', 'leaflet-bar');
-    div.innerHTML = '<div class="reset-view-button">Reset View</div>';
-    div.firstChild.onclick = () => map.setView([-42.8821, 147.3272], 7);
-    return div;
-  }.addTo(map);
-
-  document.getElementById('toggleButton').onclick = () => {
-    sidebar.classList.toggle('collapsed');
-  };
-
-  map.on('moveend', () => {
-    const bounds = map.getBounds();
-    markers.eachLayer(marker => {
-      if (bounds.contains(marker.getLatLng()) && map.getZoom() >= 12) {
-        marker.openPopup();
-      } else {
-        marker.closePopup();
+        if (heatLayer) map.removeLayer(heatLayer);
+        heatLayer = L.heatLayer(heatData, {
+      radius: 25,
+      blur: 15,
+      maxZoom: 11,
+      gradient: {
+        0.0: '#0000ff',
+        0.25: '#00ff00',
+        0.5: '#ffff00',
+        0.75: '#ff8000',
+        1.0: '#ff0000'
       }
-    });
-  });
-});
-</script>
-</body>
-</html>
+    }).addTo(map);
+      });
+    }
 
-<style>
-  @media (max-width: 768px) {
-    #sidebar { display: none; }
-    #topbar {
-      display: flex;
-      overflow-x: auto;
-      white-space: nowrap;
-      padding: 10px;
-      background: #f8f9fa;
-      gap: 8px;
-    }
-    #topbar div {
-      flex: 0 0 auto;
-      padding: 8px 12px;
-      background: #006400;
-      color: white;
-      border-radius: 20px;
-      font-weight: bold;
-      cursor: pointer;
-    }
-    #topbar div.active {
-      background: #004d00;
-    }
-  }
-</style>
+    document.getElementById('metricSelect').addEventListener('change', fetchAndRender);
+    document.getElementById('typeSelect').addEventListener('change', fetchAndRender);
+
+    fetchAndRender();
+  </script>
+
+  <div id="legend" style="
+    position: absolute;
+    bottom: 20px;
+    left: 10px;
+    background: white;
+    padding: 10px;
+    border-radius: 8px;
+    font-size: 13px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    z-index: 1000;
+  ">
+    <strong>Heatmap Intensity</strong><br>
+    <div style="margin-top: 5px;">
+      <div style="display: flex; align-items: center; margin: 2px 0;">
+        <span style="width: 16px; height: 10px; background:#ff0000; display:inline-block; margin-right:5px;"></span> High
+      </div>
+      <div style="display: flex; align-items: center; margin: 2px 0;">
+        <span style="width: 16px; height: 10px; background:#ff8000; display:inline-block; margin-right:5px;"></span> Hot
+      </div>
+      <div style="display: flex; align-items: center; margin: 2px 0;">
+        <span style="width: 16px; height: 10px; background:#ffff00; display:inline-block; margin-right:5px;"></span> Warm
+      </div>
+      <div style="display: flex; align-items: center; margin: 2px 0;">
+        <span style="width: 16px; height: 10px; background:#00ff00; display:inline-block; margin-right:5px;"></span> Cool
+      </div>
+      <div style="display: flex; align-items: center; margin: 2px 0;">
+        <span style="width: 16px; height: 10px; background:#0000ff; display:inline-block; margin-right:5px;"></span> Low
+      </div>
+    </div>
+  </div>
+</body>
+
+</html>
